@@ -2078,28 +2078,113 @@ private theorem globalThetaPrincipalValue_isClosedEmbedding_countable : Countabl
     HeightOneSpectrum.ext h).countable
 
 open Classical in
+/-- On the product of an old test `f` and a test `g` at one new place `v`, the principal value
+of the enlarged stage acts through `f`. -/
+private theorem globalThetaPrincipalValue_isClosedEmbedding_insertTest {S₀ S : Finset V}
+    (h₀ : S₀ ⊆ S) (v : V) (hv : v ∉ S)
+    (e : InductiveTensor ℬₛ(S) ℬ(FinitePlaceProduct F (insert v S \ S)) ≃L[ℂ] ℬₛ(insert v S))
+    (he : ∀ (f : ℬₛ(S)) (g : ℬ(FinitePlaceProduct F (insert v S \ S)))
+      (z : SAdeleRing F (insert v S)),
+      e (f ⊗ₜ[ℂ] g) (Multiplicative.ofAdd z) =
+        f (Multiplicative.ofAdd (z.1, fun w : S ↦
+          z.2 ⟨w.val, Finset.mem_insert_of_mem w.property⟩)) *
+        g (Multiplicative.ofAdd (fun w : ↥(insert v S \ S) ↦
+          z.2 ⟨w.val, (Finset.mem_sdiff.mp w.property).1⟩)))
+    (g : ℬ(FinitePlaceProduct F (insert v S \ S))) (f : ℬₛ(S)) :
+    sAdelePrincipalValue F (h₀.trans (Finset.subset_insert v S)) (e (f ⊗ₜ[ℂ] g)) =
+      e (sAdelePrincipalValue F h₀ f ⊗ₜ[ℂ] g) := by
+  have hd := sAdeleDifferenceSchwartz_insert_pure (F := F) v hv e he g
+  let φ := hd.choose
+  have hφ := hd.choose_spec
+  let eR (R : Finset V) := (sAdeleSchwartz_inductiveTensor_equiv F R).choose
+  let P (u : V) : ℬ(u.adicCompletion F) →ₗ[ℂ] ℬ(u.adicCompletion F) :=
+    if u ∈ S₀ then (finitePlacePrincipalValue u).toLinearMap else LinearMap.id
+  let op (R : Finset V) (b : ∀ w : R, ℬ(w.val.adicCompletion F)) (w : R) := P w.val (b w)
+  have pv (R : Finset V) (hR : S₀ ⊆ R) (a : ℬ(InfiniteAdeleRing F))
+      (b : ∀ w : R, ℬ(w.val.adicCompletion F)) :
+      sAdelePrincipalValue F hR (eR R (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w))) =
+        eR R (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, op R b w)) := by
+    unfold sAdelePrincipalValue
+    with_reducible exact sLocalThetaPrincipalValue_transition_tmul (eR R) (fun w : R ↦ P w.val) a b
+  let G (u : V) : ℬ(u.adicCompletion F) := if h : u = v then h ▸ φ else 0
+  let extend (b : ∀ w : S, ℬ(w.val.adicCompletion F)) (w : ↥(insert v S)) :
+      ℬ(w.val.adicCompletion F) :=
+    if hw : w.val ∈ S then b ⟨w.val, hw⟩ else G w.val
+  have hext (a : ℬ(InfiniteAdeleRing F)) (b : ∀ w : S, ℬ(w.val.adicCompletion F)) :
+      e (eR S (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] g) =
+        eR (insert v S) (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, extend b w)) := by
+    refine hφ a b (extend b) (fun w ↦ dite_eq_left w.property) ?_
+    change (if hw : v ∈ S then b ⟨v, hw⟩ else G v) = φ
+    rw [dite_eq_right hv]
+    change (if h : v = v then h ▸ φ else 0) = φ
+    rw [dite_eq_left rfl]
+  have hcomm (b : ∀ w : S, ℬ(w.val.adicCompletion F)) :
+      extend (op S b) = op (insert v S) (extend b) := by
+    with_reducible
+      exact sLocalThetaPrincipalValue_transition_factors (M := fun u : V ↦ ℬ(u.adicCompletion F))
+        (T := insert v S) h₀ (fun u ↦ (finitePlacePrincipalValue u).toLinearMap) G b
+  have key (a : ℬ(InfiniteAdeleRing F)) (b : ∀ w : S, ℬ(w.val.adicCompletion F)) :
+      e (sAdelePrincipalValue F h₀ (eR S (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w))) ⊗ₜ[ℂ] g) =
+        sAdelePrincipalValue F (h₀.trans (Finset.subset_insert v S))
+          (e (eR S (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] g)) := by
+    have h1 := congrArg (fun k ↦ e (k ⊗ₜ[ℂ] g)) (pv S h₀ a b)
+    have h2 := hext a (op S b)
+    have h3 := congrArg (fun c : ∀ w : ↥(insert v S), ℬ(w.val.adicCompletion F) ↦
+      eR (insert v S) (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, c w))) (hcomm b)
+    have h4 := pv (insert v S) (h₀.trans (Finset.subset_insert v S)) a (extend b)
+    have h5 := congrArg (sAdelePrincipalValue F (h₀.trans (Finset.subset_insert v S))) (hext a b)
+    exact h1.trans (h2.trans (h3.trans (h4.symm.trans h5.symm)))
+  let Eg : ℬₛ(S) →ₗ[ℂ] ℬₛ(insert v S) := e.toLinearMap.comp ((TensorProduct.mk ℂ _ _).flip g)
+  have hsq := sLocalThetaPrincipalValue_transition_ext (eR S) Eg (sAdelePrincipalValue F h₀)
+    (sAdelePrincipalValue F (h₀.trans (Finset.subset_insert v S))) key
+  exact (LinearMap.congr_fun hsq f).symm
+
+open Classical in
 /-- Paper: Lemma 5.3.1.5, proof, p. 242.
 At a stage `S` containing the selected places `S₀`, the transition of theta classes to the stage
 `T = insert v S` with one more finite place `v` has a continuous linear left inverse that
 commutes with the principal value.
 
-`sLocalThetaTransition_exists_leftInverse_insert` gives a continuous left inverse: it reads the
-theta function of a class at the S-ideles completed at `v` by a unit, and by a unit times a fixed
-`c` with `Valued.v c = WithZero.exp 1`, and averages the difference over the units at `v`. On the
-class of a test `f ⊗ h`, with `f` on the stage `S` and `h` at `v`, this is a finite combination of
-the classes of translates of `f` by `(S ∪ {v})`-units. The principal value acts as the identity at
-`v` and commutes with translation by S-ideles, so it commutes with this left inverse.
+The left inverse is the one of `sLocalThetaTransition_exists_leftInverse_insert_commute`. On the
+class of the product of an old test `f` and a new test `g` it is a finite combination of classes
+of translates of `f`. The principal value of `T` acts on `f ⊗ g` through `f`, and on classes it
+commutes with translation by S-ideles (`sLocalThetaPrincipalValue_equivariant`).
 With the closed embeddings on the stages, these left inverses give the global closed embedding
 `globalThetaPrincipalValue_isClosedEmbedding`. They replace the printed step that the global
 range is the image of the range at one fixed stage.
 The larger stage `T` is an argument with `hT : T = insert v S`, so that the lemma applies to
 stages that equal `insert v S` without being written that way. -/
 private theorem globalThetaPrincipalValue_isClosedEmbedding_retraction {S₀ S T : Finset V}
-    (h₀ : S₀ ⊆ S) (hST : S ⊆ T) (v : V) (hv : v ∉ S) (hT : T = insert v S) :
+    (h₀ : S₀ ⊆ S) (hn : S₀.Nonempty) (hST : S ⊆ T) (v : V) (hv : v ∉ S)
+    (hT : T = insert v S) :
     ∃ r : Θₛ(T) →L[ℂ] Θₛ(S),
       Function.LeftInverse r (sLocalThetaTransition (F := F) hST) ∧
       ∀ x, r (sLocalThetaPrincipalValue F (h₀.trans hST) x) =
-        sLocalThetaPrincipalValue F h₀ (r x) := by sorry
+        sLocalThetaPrincipalValue F h₀ (r x) := by
+  subst hT
+  have hr := sLocalThetaTransition_exists_leftInverse_insert_commute (F := F) (S := S) v hv
+  have hd := sAdeleDifferenceSchwartz_inductiveTensor_equiv F (Finset.subset_insert v S)
+  let r := hr.choose
+  let e := hd.choose
+  refine ⟨r, hr.choose_spec.1, fun x ↦ ?_⟩
+  -- On the class of a product of an old and a new test, the principal value passes to the old
+  -- test, and the left inverse commutes with it there.
+  have key (f : ℬₛ(S)) (g : ℬ(FinitePlaceProduct F (insert v S \ S))) :
+      r (sLocalThetaPrincipalValue F (h₀.trans hST) (Submodule.Quotient.mk (e (f ⊗ₜ[ℂ] g)))) =
+        sLocalThetaPrincipalValue F h₀ (r (Submodule.Quotient.mk (e (f ⊗ₜ[ℂ] g)))) :=
+    (congrArg (fun k ↦ r (Submodule.Quotient.mk k : Θₛ(insert v S)))
+      (globalThetaPrincipalValue_isClosedEmbedding_insertTest h₀ v hv e hd.choose_spec g f)).trans
+      (hr.choose_spec.2 e hd.choose_spec (sAdelePrincipalValue F h₀)
+        (sLocalThetaPrincipalValue F h₀) (fun _ ↦ rfl)
+        (fun γ f ↦ sLocalThetaPrincipalValue_equivariant h₀ hn γ f) f g)
+  have hlin : (r.toLinearMap.comp (sLocalThetaPrincipalValue F (h₀.trans hST))).comp
+        ((Kₛ(insert v S)).mkQ.comp e.toLinearMap) =
+      ((sLocalThetaPrincipalValue F h₀).comp r.toLinearMap).comp
+        ((Kₛ(insert v S)).mkQ.comp e.toLinearMap) :=
+    TensorProduct.ext' key
+  obtain ⟨k, rfl⟩ := (Kₛ(insert v S)).mkQ_surjective x
+  obtain ⟨t, rfl⟩ := e.surjective k
+  exact LinearMap.congr_fun hlin t
 
 -- TODO(paper-gap): The proof of global closed range claims that the image is contained in
 -- any fixed S-stage. This does not follow from stage compatibility and fails at larger stages.
@@ -2145,7 +2230,7 @@ theorem globalThetaPrincipalValue_isClosedEmbedding {S₀ : Finset V} (hn : S₀
         fun z ↦ LinearMap.congr_fun (sLocalThetaPrincipalValue_transition (h₀ (n + 1)) hsub hn) z⟩
       exact (LinearMap.congr_fun (sLocalThetaToGlobal_comp hsub) _).trans
         (LinearMap.congr_fun (sLocalThetaToGlobal_comp (hstep n)) z)
-    · exact globalThetaPrincipalValue_isClosedEmbedding_retraction (h₀ n) (hstep n) (e n) hv rfl
+    · exact globalThetaPrincipalValue_isClosedEmbedding_retraction (h₀ n) hn (hstep n) (e n) hv rfl
   choose r hr hrP using hret
   have hexh (x : Θ𝔽) : ∃ n, ∃ z : Θₛ(S n), ι n z = x := by
     obtain ⟨T, y, rfl⟩ := sLocalThetaToGlobal_exhaustive x
